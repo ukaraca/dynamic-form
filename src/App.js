@@ -1,26 +1,172 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, { useState, useEffect } from 'react';
 import './App.css';
+import FormCreate from './components/FormCreate';
+import { Form, Divider, Button, Spin, message, Collapse, Icon } from 'antd';
+import { withRouter } from 'react-router-dom';
+import qs from 'query-string'
+import Axios from 'axios';
+import PieCharts from './components/PieCharts'
 
-function App() {
+const { Panel } = Collapse;
+function App({ location, form }) {
+  const { formId } = qs.parse(location.search);
+
+  useEffect(() => {
+    Axios.post('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select', {}, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      data: {
+        id: formId
+      }
+    }).then(res => {
+      const parsed = JSON.parse(res.data[0].form_json);
+      const parsedData = JSON.parse(parsed.data);
+      parsed.data = parsedData
+
+      setEndpoint(res.data[0].Url);
+      setData(parsed);
+      setFetching(false);
+    }).catch(err => {
+      console.log(err);
+      message.error('Bir Hata Oluştu!')
+    })
+  }, [])
+
+  const [fetching, setFetching] = useState(true);
+  const [data, setData] = useState({});
+  const [endpoint, setEndpoint] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [pieData, setPieData] = useState([])
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    form.validateFields((err, values) => {
+      setLoading(true)
+      if (!err) {
+        Axios.post(`https://apigateway.tarbil.gov.tr${endpoint}`, {}, {
+          data: values
+        }).then(res => {
+          console.log(res.data);
+          setLoading(false);
+          message.success('Başarıyla Kaydedildi.')
+        }).catch(err => {
+          console.log(err);
+          setLoading(false);
+          message.error('Bir Hata Oluştu.')
+        })
+        // console.log('Received values of form: ', values);
+      } else {
+        setLoading(false)
+      }
+    });
+  };
+
+  const onCollapse = (e) => {
+    if (!pieData.length) {
+      setChartLoading(true);
+      Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-pie', {
+        headers: {
+          'Content-Type': 'application/json'
+        }, data: {}
+      })
+        .then(res => {
+          setChartLoading(false);
+          setPieData(res.data);
+        })
+    }
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{
+      width: '50%',
+      margin: 'auto',
+      padding: '10px',
+      border: '1px solid #d3d3d3',
+      boxShadow: '-3px -1px 20px 2px #d3d3d3',
+      borderRadius: '5px',
+      minHeight: '500px',
+      marginTop: '50px',
+      display: fetching ? 'flex' : 'block',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      {
+        !fetching ?
+          <Form onSubmit={handleSubmit} >
+            <h1 style={{ textAlign: 'center', marginTop: '24px', marginBottom: '24px' }} >{data.submitUrl}</h1>
+            <h3 style={{ textAlign: 'center', marginTop: '24px', marginBottom: '24px' }} >{data.description}</h3>
+
+            <div style={{ width: '100%', margin: 'auto' }}>
+              <Collapse bordered={false} onChange={onCollapse} defaultActiveKey={['2']} accordion>
+                <Panel style={{
+                  background: `white`,
+                  border: `none`,
+                }}
+                  showArrow={false}
+                  header={
+                    <div>
+                      <Divider orientation="left">
+                        <Icon type="pie-chart" />
+                        {` Veri Önizleme`}
+                      </Divider>
+                    </div>
+                  } key="1">
+                  {
+                    !chartLoading ? <PieCharts pieData={pieData} />
+                      :
+                      <div>
+                        <Spin tip="Yükleniyor..." />
+                      </div>
+                  }
+
+                </Panel>
+                <Panel
+                  style={{
+                    background: `white`,
+                    border: `none`,
+                  }}
+                  showArrow={false}
+                  header={
+                    <div>
+                      <Divider orientation="left">
+                        <Icon type="form" />
+                        {` Form Bilgileri`}
+                      </Divider>
+                    </div>
+                  } key="2"
+                >
+
+                  {
+                    data.data.map((e, i) => {
+                      return (
+                        <FormCreate
+                          form={form}
+                          title={data.submitUrl}
+                          key={i}
+                          item={e}
+                        />
+                      )
+                    }
+                    )
+                  }
+                  <Form.Item style={{ display: 'flex', justifyContent: 'center' }} >
+                    <Button loading={loading} htmlType="submit" type="primary">Kaydet</Button>
+                  </Form.Item>
+                </Panel>
+              </Collapse>
+            </div>
+
+          </Form>
+          :
+          <div>
+            <Spin tip="Yükleniyor..." />
+          </div>
+      }
+
     </div>
   );
 }
-
-export default App;
+App = Form.create({})(App);
+export default withRouter(App);

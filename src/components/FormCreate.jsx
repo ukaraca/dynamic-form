@@ -20,7 +20,6 @@ const RadioGroup = Radio.Group;
 const Option = Select.Option;
 
 function FormCreate({ item, form }) {
-
   const getFormItem = (item, props) => {
     const { type } = item;
     if (type === `input`) {

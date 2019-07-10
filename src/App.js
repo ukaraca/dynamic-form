@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import FormCreate from './components/FormCreate';
 import { Form, Divider, Button, Spin, message, Collapse, Icon } from 'antd';
 import { withRouter } from 'react-router-dom';
 import qs from 'query-string'
 import Axios from 'axios';
-import PieCharts from './components/PieCharts'
+import { PieCharts, LineCharts, DataTable } from './components/Charts'
 
 const { Panel } = Collapse;
 function App({ location, form }) {
   const { formId } = qs.parse(location.search);
+
+  const [fetching, setFetching] = useState(true);
+  const [data, setData] = useState({});
+  const [endpoint, setEndpoint] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [chartData, setChartData] = useState([]);
+  const [chartType, setChartType] = useState('');
 
   useEffect(() => {
     Axios.post('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select', {}, {
@@ -19,26 +25,23 @@ function App({ location, form }) {
       data: {
         id: formId
       }
-    }).then(res => {
+    }).then(async res => {
       const parsed = JSON.parse(res.data[0].form_json);
       const parsedData = JSON.parse(parsed.data);
-      parsed.data = parsedData
+      parsed.data = parsedData;
 
+      await getChart(parsed.formRender);
       setEndpoint(res.data[0].Url);
       setData(parsed);
+      setChartType(parsed.formRender);
       setFetching(false);
+
     }).catch(err => {
       console.log(err);
       message.error('Bir Hata Oluştu!')
     })
   }, [])
 
-  const [fetching, setFetching] = useState(true);
-  const [data, setData] = useState({});
-  const [endpoint, setEndpoint] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [pieData, setPieData] = useState([])
 
   const handleSubmit = e => {
     e.preventDefault();
@@ -56,26 +59,44 @@ function App({ location, form }) {
           setLoading(false);
           message.error('Bir Hata Oluştu.')
         })
-        // console.log('Received values of form: ', values);
       } else {
         setLoading(false)
       }
     });
   };
 
-  const onCollapse = (e) => {
-    if (!pieData.length) {
-      setChartLoading(true);
+  const getChart = (type) => {
+    if (type === 'piechart') {
       Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-pie', {
         headers: {
           'Content-Type': 'application/json'
         }, data: {}
       })
         .then(res => {
-          setChartLoading(false);
-          setPieData(res.data);
+          setChartData(res.data);
         })
     }
+    // else if (type === 'linechart') {
+    //   Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-line', {
+    //     headers: {
+    //       'Content-Type': 'application/json'
+    //     }, data: {}
+    //   })
+    //     .then(res => {
+    //       setChartData(res.data);
+    //     })
+    // }
+    else {
+      Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-line', {
+        headers: {
+          'Content-Type': 'application/json'
+        }, data: {}
+      })
+        .then(res => {
+          setChartData(res.data);
+        })
+    }
+
   }
 
   return (
@@ -86,7 +107,7 @@ function App({ location, form }) {
       border: '1px solid #d3d3d3',
       boxShadow: '-3px -1px 20px 2px #d3d3d3',
       borderRadius: '5px',
-      minHeight: '500px',
+      minHeight: '250px',
       marginTop: '50px',
       display: fetching ? 'flex' : 'block',
       justifyContent: 'center',
@@ -99,7 +120,7 @@ function App({ location, form }) {
             <h3 style={{ textAlign: 'center', marginTop: '24px', marginBottom: '24px' }} >{data.description}</h3>
 
             <div style={{ width: '100%', margin: 'auto' }}>
-              <Collapse bordered={false} onChange={onCollapse} defaultActiveKey={['2']} accordion>
+              <Collapse bordered={false} defaultActiveKey={['2']} accordion>
                 <Panel style={{
                   background: `white`,
                   border: `none`,
@@ -108,17 +129,24 @@ function App({ location, form }) {
                   header={
                     <div>
                       <Divider orientation="left">
-                        <Icon type="pie-chart" />
+                        <Icon
+                          type={
+                            chartType === 'piechart' ? 'pie-chart'
+                              : chartType === 'linechart' ? 'line-chart'
+                                : chartType === 'datatable' ? 'table'
+                                  : chartType === 'radar' ? 'radar-chart' :
+                                    'settings'} />
                         {` Veri Önizleme`}
                       </Divider>
                     </div>
                   } key="1">
                   {
-                    !chartLoading ? <PieCharts pieData={pieData} />
+                    chartType === 'piechart' ? <PieCharts chartData={chartData} />
                       :
-                      <div>
-                        <Spin tip="Yükleniyor..." />
-                      </div>
+                      chartType === 'linechart' ? <LineCharts chartData={chartData} />
+                        :
+                        chartType === 'datatable' ? <DataTable chartData={chartData} />
+                          : null
                   }
 
                 </Panel>
@@ -137,13 +165,11 @@ function App({ location, form }) {
                     </div>
                   } key="2"
                 >
-
                   {
                     data.data.map((e, i) => {
                       return (
                         <FormCreate
                           form={form}
-                          title={data.submitUrl}
                           key={i}
                           item={e}
                         />
@@ -157,7 +183,6 @@ function App({ location, form }) {
                 </Panel>
               </Collapse>
             </div>
-
           </Form>
           :
           <div>

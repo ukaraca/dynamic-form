@@ -16,6 +16,8 @@ function App({ location, form }) {
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState([]);
   const [chartType, setChartType] = useState('');
+  const [selectUrl, setSelectUrl] = useState('');
+  const [activeKey, setActiveKey] = useState('1')
 
   useEffect(() => {
     Axios.post('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select', {}, {
@@ -29,12 +31,14 @@ function App({ location, form }) {
       const parsed = JSON.parse(res.data[0].form_json);
       const parsedData = JSON.parse(parsed.data);
       parsed.data = parsedData;
+      await getChart(res.data[0].selectUrl);
 
-      await getChart(parsed.formRender);
+      setSelectUrl(res.data[0].selectUrl);
       setEndpoint(res.data[0].Url);
       setData(parsed);
       setChartType(parsed.formRender);
       setFetching(false);
+      document.title = `ReActor Dinamik Form - ${res.data[0].name}`
 
     }).catch(err => {
       console.log(err);
@@ -53,11 +57,13 @@ function App({ location, form }) {
         }).then(res => {
           console.log(res.data);
           setLoading(false);
-          message.success('Başarıyla Kaydedildi.')
+          message.success('Başarıyla Kaydedildi.');
+          setActiveKey('1')
+          getChart(selectUrl);
         }).catch(err => {
           console.log(err);
           setLoading(false);
-          message.error('Bir Hata Oluştu.')
+          message.error('Bir Hata Oluştu.');
         })
       } else {
         setLoading(false)
@@ -66,16 +72,16 @@ function App({ location, form }) {
   };
 
   const getChart = (type) => {
-    if (type === 'piechart') {
-      Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-pie', {
-        headers: {
-          'Content-Type': 'application/json'
-        }, data: {}
-      })
-        .then(res => {
-          setChartData(res.data);
-        })
-    }
+    // if (type === 'piechart') {
+    //   Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-pie', {
+    //     headers: {
+    //       'Content-Type': 'application/json'
+    //     }, data: {}
+    //   })
+    //     .then(res => {
+    //       setChartData(res.data);
+    //     })
+    // }
     // else if (type === 'linechart') {
     //   Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-line', {
     //     headers: {
@@ -86,17 +92,29 @@ function App({ location, form }) {
     //       setChartData(res.data);
     //     })
     // }
-    else {
-      Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-line', {
-        headers: {
-          'Content-Type': 'application/json'
-        }, data: {}
-      })
-        .then(res => {
-          setChartData(res.data);
-        })
-    }
+    // else {
+    //   Axios.get('https://apigateway.tarbil.gov.tr/api/v1/dinamik-form/select-line', {
+    //     headers: {
+    //       'Content-Type': 'application/json'
+    //     }, data: {}
+    //   })
+    //     .then(res => {
+    //       setChartData(res.data);
+    //     })
+    // }
 
+    Axios.get(`https://apigateway.tarbil.gov.tr${type}`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }, data: {}
+    })
+      .then(res => {
+        setChartData(res.data);
+      })
+  }
+
+  const onAccordionChange = (e) => {
+    setActiveKey(e)
   }
 
   return (
@@ -120,7 +138,7 @@ function App({ location, form }) {
             <h3 style={{ textAlign: 'center', marginTop: '24px', marginBottom: '24px' }} >{data.description}</h3>
 
             <div style={{ width: '100%', margin: 'auto' }}>
-              <Collapse bordered={false} defaultActiveKey={['2']} accordion>
+              <Collapse bordered={false} defaultActiveKey={['1']} accordion onChange={onAccordionChange} activeKey={activeKey}>
                 <Panel style={{
                   background: `white`,
                   border: `none`,
@@ -141,11 +159,11 @@ function App({ location, form }) {
                     </div>
                   } key="1">
                   {
-                    chartType === 'piechart' ? <PieCharts chartData={chartData} />
+                    chartType === 'piechart' && chartData.length ? <PieCharts chartData={chartData} />
                       :
-                      chartType === 'linechart' ? <LineCharts chartData={chartData} />
+                      chartType === 'linechart' && chartData.length ? <LineCharts chartData={chartData} />
                         :
-                        chartType === 'datatable' ? <DataTable chartData={chartData} />
+                        chartType === 'datatable' && chartData.length ? <DataTable chartData={chartData} />
                           : null
                   }
 
